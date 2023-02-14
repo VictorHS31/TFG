@@ -1,12 +1,13 @@
+import os
+import utils
+import shutil
+
 carpeta_imagenes = "./Gas-Meter-Counter/JPEGImages"
 carpeta_anotaciones = "./Gas-Meter-Counter/Annotations"
 carpeta_anotaciones_digits = "./Gas-Meter-Counter/Annotations_digits"
+carpeta_labels = "./Labels"
 
-import xml.etree.ElementTree as ET
-import os
-import cv2 as cv
-from matplotlib import pyplot as plt
-
+utils.eliminar(carpeta_imagenes,carpeta_anotaciones,carpeta_anotaciones_digits)
 
 all_images=os.listdir(carpeta_imagenes)
 print(f"Total images : {len(all_images)}")
@@ -17,36 +18,41 @@ print(f"Total annotations : {len(all_anotaciones)}")
 all_anotaciones_digits = os.listdir(carpeta_anotaciones_digits)
 print(f"Total annotations digits : {len(all_anotaciones_digits)}")
 
+boxes = []
+sizes = []
+for imagen in all_anotaciones_digits:
+  boxes.append(utils.bounding_box(imagen,carpeta_anotaciones_digits))
+  sizes.append(utils.get_size(imagen,carpeta_anotaciones))
 
-def get_digits(image):
-    bpath=carpeta_anotaciones_digits+"/"+str(image.split(".")[0]+".xml")
-    try:
-      tree = ET.parse(bpath)
-    except:
-      return []
-    root = tree.getroot()
-    objects = root.findall('object')
-    
-    digits = []
-    for o in objects:
-        name = o.find('name').text # reading bound box
-        digits.append(name)
-    return digits
+ruta = carpeta_labels + "/"
+for imagen in range(len(boxes)):
+  ancho = int(sizes[imagen][0])
+  alto = int(sizes[imagen][1])
+  nombre = all_anotaciones_digits[imagen].replace(".xml",".txt")
+  fichero = open(ruta + nombre, "w")
+  for box in range(len(boxes[imagen])):
+    digito = boxes[imagen][box]
+    xmin = digito[0]
+    ymin = digito[1]
+    xmax = digito[2]
+    ymax = digito[3]
+    yolo = utils.normalize_YOLO(ancho,alto,xmin,ymin,xmax,ymax)
+    fichero.write(yolo)
+  fichero.close()
 
-def bounding_box(image):
-    bpath=carpeta_anotaciones+"/"+str(image.split(".")[0]+".xml")
-    tree = ET.parse(bpath)
-    root = tree.getroot()
-    objects = root.findall('object')
-    
-    for o in objects:
-        bndbox = o.find('bndbox') # reading bound box
-        xmin = int(bndbox.find('xmin').text)
-        ymin = int(bndbox.find('ymin').text)
-        xmax = int(bndbox.find('xmax').text)
-        ymax = int(bndbox.find('ymax').text)
-        print(o)
-        
-    print(xmin,ymin,xmax,ymax)
-    return (xmin,ymin,xmax,ymax)
+contador = 0
+total = len(os.listdir(carpeta_labels))
+ruta = "./Version2/"
+for label in os.listdir(carpeta_labels):
+  if contador > 0.8 * total:
+    shutil.move(carpeta_labels + "/" + label, ruta + "labels/val/" + label)
+    imagen = label.replace(".txt",".jpg")
+    shutil.move(carpeta_imagenes + "/" + imagen, ruta + "images/val/" + imagen)
+  else:
+    shutil.move(carpeta_labels + "/" + label, ruta + "labels/train/" + label)
+    imagen = label.replace(".txt",".jpg")
+    shutil.move(carpeta_imagenes + "/" + imagen, ruta + "images/train/" + imagen)
+  contador += 1
+
+utils.generar_ficheros("./Version2/images/")
 
