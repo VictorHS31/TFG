@@ -70,8 +70,8 @@ def generar_ficheros(ruta):
         aux = ruta + tipo + "/"
         print(aux)
         archivos = os.listdir(aux)
-        f = open("./Version2/" + tipo + ".txt", "w")
+        f = open("./" + tipo + ".txt", "w")
         for archivo in archivos:
             if archivo != "classes.txt": f.write(aux + archivo + "\n")
         f.close()
-        ruta = "./Version2/images/"
+        ruta = "./images/"

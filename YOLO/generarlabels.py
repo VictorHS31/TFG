@@ -54,5 +54,5 @@ for label in os.listdir(carpeta_labels):
     shutil.move(carpeta_imagenes + "/" + imagen, ruta + "images/train/" + imagen)
   contador += 1
 
-utils.generar_ficheros("./Version2/images/")
+utils.generar_ficheros("./images/")
 
