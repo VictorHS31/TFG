@@ -6,10 +6,11 @@
 
 #include "esp_camera.h"
 
-const char* ssid     = "SSID";   //your network SSID
+const char* ssid     = "MIWIFI_2G_hhGV";   //your network SSID
 const char* password = "PASSWORD";   //your network password
 const char* myDomain = "script.google.com";
-String myScript = "/macros/s/XXXXXXXXXXXXXXXXXXXXXX/exec";    //Replace with your own url
+// https://script.google.com/macros/s/AKfycbzl4qdbOAtaRXJipOlBZniQ299GMk6YE9i_1IqqpFFw2-SpkxPXeqMUVjomGbqpc6vT/exec
+String myScript = "/macros/s/AKfycbzl4qdbOAtaRXJipOlBZniQ299GMk6YE9i_1IqqpFFw2-SpkxPXeqMUVjomGbqpc6vT/exec";    //Replace with your own url
 String myFilename = "filename=ESP32-CAM.jpg";
 String mimeType = "&mimetype=image/jpeg";
 String myImage = "&data=";
