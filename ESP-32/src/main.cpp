@@ -7,7 +7,7 @@
 #include "esp_camera.h"
 
 const char* ssid     = "MIWIFI_2G_hhGV";   //your network SSID
-const char* password = "PASSWORD";   //your network password
+const char* password = "XXXXXX";   //your network password
 const char* myDomain = "script.google.com";
 // https://script.google.com/macros/s/AKfycbzl4qdbOAtaRXJipOlBZniQ299GMk6YE9i_1IqqpFFw2-SpkxPXeqMUVjomGbqpc6vT/exec
 String myScript = "/macros/s/AKfycbzl4qdbOAtaRXJipOlBZniQ299GMk6YE9i_1IqqpFFw2-SpkxPXeqMUVjomGbqpc6vT/exec";    //Replace with your own url
@@ -34,6 +34,104 @@ int waitingTime = 30000; //Wait 30 seconds to google response.
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
+
+//https://github.com/zenmanenergy/ESP8266-Arduino-Examples/
+String urlencode(String str)
+{
+    String encodedString="";
+    char c;
+    char code0;
+    char code1;
+    char code2;
+    for (int i =0; i < str.length(); i++){
+      c=str.charAt(i);
+      if (c == ' '){
+        encodedString+= '+';
+      } else if (isalnum(c)){
+        encodedString+=c;
+      } else{
+        code1=(c & 0xf)+'0';
+        if ((c & 0xf) >9){
+            code1=(c & 0xf) - 10 + 'A';
+        }
+        c=(c>>4)&0xf;
+        code0=c+'0';
+        if (c > 9){
+            code0=c - 10 + 'A';
+        }
+        code2='\0';
+        encodedString+='%';
+        encodedString+=code0;
+        encodedString+=code1;
+        //encodedString+=code2;
+      }
+      yield();
+    }
+    return encodedString;
+}
+
+void saveCapturedImage() {
+  Serial.println("Connect to " + String(myDomain));
+  WiFiClientSecure client;
+  
+  if (client.connect(myDomain, 443)) {
+    Serial.println("Connection successful");
+    
+    camera_fb_t * fb = NULL;
+    fb = esp_camera_fb_get();  
+    if(!fb) {
+      Serial.println("Camera capture failed");
+      delay(1000);
+      ESP.restart();
+      return;
+    }
+  
+    char *input = (char *)fb->buf;
+    char output[base64_enc_len(3)];
+    String imageFile = "";
+    for (int i=0;i<fb->len;i++) {
+      base64_encode(output, (input++), 3);
+      if (i%3==0) imageFile += urlencode(String(output));
+    }
+    String Data = myFilename+mimeType+myImage;
+    
+    esp_camera_fb_return(fb);
+    
+    Serial.println("Send a captured image to Google Drive.");
+    
+    client.println("POST " + myScript + " HTTP/1.1");
+    client.println("Host: " + String(myDomain));
+    client.println("Content-Length: " + String(Data.length()+imageFile.length()));
+    client.println("Content-Type: application/x-www-form-urlencoded");
+    client.println();
+    
+    client.print(Data);
+    int Index;
+    for (Index = 0; Index < imageFile.length(); Index = Index+1000) {
+      client.print(imageFile.substring(Index, Index+1000));
+    }
+    
+    Serial.println("Waiting for response.");
+    long int StartTime=millis();
+    while (!client.available()) {
+      Serial.print(".");
+      delay(100);
+      if ((StartTime+waitingTime) < millis()) {
+        Serial.println();
+        Serial.println("No response.");
+        //If you have no response, maybe need a greater value of waitingTime
+        break;
+      }
+    }
+    Serial.println();   
+    while (client.available()) {
+      Serial.print(char(client.read()));
+    }  
+  } else {         
+    Serial.println("Connected to " + String(myDomain) + " failed.");
+  }
+  client.stop();
+}
 
 void setup()
 {
@@ -103,100 +201,5 @@ void loop() {
   //}
 }
 
-void saveCapturedImage() {
-  Serial.println("Connect to " + String(myDomain));
-  WiFiClientSecure client;
-  
-  if (client.connect(myDomain, 443)) {
-    Serial.println("Connection successful");
-    
-    camera_fb_t * fb = NULL;
-    fb = esp_camera_fb_get();  
-    if(!fb) {
-      Serial.println("Camera capture failed");
-      delay(1000);
-      ESP.restart();
-      return;
-    }
-  
-    char *input = (char *)fb->buf;
-    char output[base64_enc_len(3)];
-    String imageFile = "";
-    for (int i=0;i<fb->len;i++) {
-      base64_encode(output, (input++), 3);
-      if (i%3==0) imageFile += urlencode(String(output));
-    }
-    String Data = myFilename+mimeType+myImage;
-    
-    esp_camera_fb_return(fb);
-    
-    Serial.println("Send a captured image to Google Drive.");
-    
-    client.println("POST " + myScript + " HTTP/1.1");
-    client.println("Host: " + String(myDomain));
-    client.println("Content-Length: " + String(Data.length()+imageFile.length()));
-    client.println("Content-Type: application/x-www-form-urlencoded");
-    client.println();
-    
-    client.print(Data);
-    int Index;
-    for (Index = 0; Index < imageFile.length(); Index = Index+1000) {
-      client.print(imageFile.substring(Index, Index+1000));
-    }
-    
-    Serial.println("Waiting for response.");
-    long int StartTime=millis();
-    while (!client.available()) {
-      Serial.print(".");
-      delay(100);
-      if ((StartTime+waitingTime) < millis()) {
-        Serial.println();
-        Serial.println("No response.");
-        //If you have no response, maybe need a greater value of waitingTime
-        break;
-      }
-    }
-    Serial.println();   
-    while (client.available()) {
-      Serial.print(char(client.read()));
-    }  
-  } else {         
-    Serial.println("Connected to " + String(myDomain) + " failed.");
-  }
-  client.stop();
-}
 
-//https://github.com/zenmanenergy/ESP8266-Arduino-Examples/
-String urlencode(String str)
-{
-    String encodedString="";
-    char c;
-    char code0;
-    char code1;
-    char code2;
-    for (int i =0; i < str.length(); i++){
-      c=str.charAt(i);
-      if (c == ' '){
-        encodedString+= '+';
-      } else if (isalnum(c)){
-        encodedString+=c;
-      } else{
-        code1=(c & 0xf)+'0';
-        if ((c & 0xf) >9){
-            code1=(c & 0xf) - 10 + 'A';
-        }
-        c=(c>>4)&0xf;
-        code0=c+'0';
-        if (c > 9){
-            code0=c - 10 + 'A';
-        }
-        code2='\0';
-        encodedString+='%';
-        encodedString+=code0;
-        encodedString+=code1;
-        //encodedString+=code2;
-      }
-      yield();
-    }
-    return encodedString;
-}
+

@@ -1,201 +1,140 @@
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include "soc/soc.h"
-#include "soc/rtc_cntl_reg.h"
-#include "Base64.h"
+/*
+ * Copyright (c) 2013 Adam Rudd.
+ * See LICENSE for more information
+ * https://github.com/adamvr/arduino-base64 
+ */
+#if (defined(__AVR__))
+#include <avr\pgmspace.h>
+#else
+#include <pgmspace.h>
+#endif
 
-#include "esp_camera.h"
+const char PROGMEM b64_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		"abcdefghijklmnopqrstuvwxyz"
+		"0123456789+/";
 
-const char* ssid     = "SSID";   //your network SSID
-const char* password = "PASSWORD";   //your network password
-const char* myDomain = "script.google.com";
-String myScript = "/macros/s/XXXXXXXXXXXXXXXXXXXXXX/exec";    //Replace with your own url
-String myFilename = "filename=ESP32-CAM.jpg";
-String mimeType = "&mimetype=image/jpeg";
-String myImage = "&data=";
+/* 'Private' declarations */
+inline void a3_to_a4(unsigned char * a4, unsigned char * a3);
+inline void a4_to_a3(unsigned char * a3, unsigned char * a4);
+inline unsigned char b64_lookup(char c);
 
-int waitingTime = 30000; //Wait 30 seconds to google response.
+int base64_encode(char *output, char *input, int inputLen) {
+	int i = 0, j = 0;
+	int encLen = 0;
+	unsigned char a3[3];
+	unsigned char a4[4];
 
-#define PWDN_GPIO_NUM     32
-#define RESET_GPIO_NUM    -1
-#define XCLK_GPIO_NUM      0
-#define SIOD_GPIO_NUM     26
-#define SIOC_GPIO_NUM     27
+	while(inputLen--) {
+		a3[i++] = *(input++);
+		if(i == 3) {
+			a3_to_a4(a4, a3);
 
-#define Y9_GPIO_NUM       35
-#define Y8_GPIO_NUM       34
-#define Y7_GPIO_NUM       39
-#define Y6_GPIO_NUM       36
-#define Y5_GPIO_NUM       21
-#define Y4_GPIO_NUM       19
-#define Y3_GPIO_NUM       18
-#define Y2_GPIO_NUM        5
-#define VSYNC_GPIO_NUM    25
-#define HREF_GPIO_NUM     23
-#define PCLK_GPIO_NUM     22
+			for(i = 0; i < 4; i++) {
+				output[encLen++] = pgm_read_byte(&b64_alphabet[a4[i]]);
+			}
 
-void setup()
-{
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
-  
-  Serial.begin(115200);
-  delay(10);
-  
-  WiFi.mode(WIFI_STA);
+			i = 0;
+		}
+	}
 
-  Serial.println("");
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);  
+	if(i) {
+		for(j = i; j < 3; j++) {
+			a3[j] = '\0';
+		}
 
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
+		a3_to_a4(a4, a3);
 
-  Serial.println("");
-  Serial.println("STAIP address: ");
-  Serial.println(WiFi.localIP());
-    
-  Serial.println("");
+		for(j = 0; j < i + 1; j++) {
+			output[encLen++] = pgm_read_byte(&b64_alphabet[a4[j]]);
+		}
 
-  camera_config_t config;
-  config.ledc_channel = LEDC_CHANNEL_0;
-  config.ledc_timer = LEDC_TIMER_0;
-  config.pin_d0 = Y2_GPIO_NUM;
-  config.pin_d1 = Y3_GPIO_NUM;
-  config.pin_d2 = Y4_GPIO_NUM;
-  config.pin_d3 = Y5_GPIO_NUM;
-  config.pin_d4 = Y6_GPIO_NUM;
-  config.pin_d5 = Y7_GPIO_NUM;
-  config.pin_d6 = Y8_GPIO_NUM;
-  config.pin_d7 = Y9_GPIO_NUM;
-  config.pin_xclk = XCLK_GPIO_NUM;
-  config.pin_pclk = PCLK_GPIO_NUM;
-  config.pin_vsync = VSYNC_GPIO_NUM;
-  config.pin_href = HREF_GPIO_NUM;
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
-  config.pin_pwdn = PWDN_GPIO_NUM;
-  config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA;  // UXGA|SXGA|XGA|SVGA|VGA|CIF|QVGA|HQVGA|QQVGA
-  config.jpeg_quality = 10;
-  config.fb_count = 1;
-  
-  esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x", err);
-    delay(1000);
-    ESP.restart();
-  }
+		while((i++ < 3)) {
+			output[encLen++] = '=';
+		}
+	}
+	output[encLen] = '\0';
+	return encLen;
 }
 
-boolean enviar = true;
+int base64_decode(char * output, char * input, int inputLen) {
+	int i = 0, j = 0;
+	int decLen = 0;
+	unsigned char a3[3];
+	unsigned char a4[4];
 
-void loop() {
-  //if(enviar) {
-    saveCapturedImage();
-    enviar = false;
-    delay(60000);
-  //}
+
+	while (inputLen--) {
+		if(*input == '=') {
+			break;
+		}
+
+		a4[i++] = *(input++);
+		if (i == 4) {
+			for (i = 0; i <4; i++) {
+				a4[i] = b64_lookup(a4[i]);
+			}
+
+			a4_to_a3(a3,a4);
+
+			for (i = 0; i < 3; i++) {
+				output[decLen++] = a3[i];
+			}
+			i = 0;
+		}
+	}
+
+	if (i) {
+		for (j = i; j < 4; j++) {
+			a4[j] = '\0';
+		}
+
+		for (j = 0; j <4; j++) {
+			a4[j] = b64_lookup(a4[j]);
+		}
+
+		a4_to_a3(a3,a4);
+
+		for (j = 0; j < i - 1; j++) {
+			output[decLen++] = a3[j];
+		}
+	}
+	output[decLen] = '\0';
+	return decLen;
 }
 
-void saveCapturedImage() {
-  Serial.println("Connect to " + String(myDomain));
-  WiFiClientSecure client;
-  
-  if (client.connect(myDomain, 443)) {
-    Serial.println("Connection successful");
-    
-    camera_fb_t * fb = NULL;
-    fb = esp_camera_fb_get();  
-    if(!fb) {
-      Serial.println("Camera capture failed");
-      delay(1000);
-      ESP.restart();
-      return;
-    }
-  
-    char *input = (char *)fb->buf;
-    char output[base64_enc_len(3)];
-    String imageFile = "";
-    for (int i=0;i<fb->len;i++) {
-      base64_encode(output, (input++), 3);
-      if (i%3==0) imageFile += urlencode(String(output));
-    }
-    String Data = myFilename+mimeType+myImage;
-    
-    esp_camera_fb_return(fb);
-    
-    Serial.println("Send a captured image to Google Drive.");
-    
-    client.println("POST " + myScript + " HTTP/1.1");
-    client.println("Host: " + String(myDomain));
-    client.println("Content-Length: " + String(Data.length()+imageFile.length()));
-    client.println("Content-Type: application/x-www-form-urlencoded");
-    client.println();
-    
-    client.print(Data);
-    int Index;
-    for (Index = 0; Index < imageFile.length(); Index = Index+1000) {
-      client.print(imageFile.substring(Index, Index+1000));
-    }
-    
-    Serial.println("Waiting for response.");
-    long int StartTime=millis();
-    while (!client.available()) {
-      Serial.print(".");
-      delay(100);
-      if ((StartTime+waitingTime) < millis()) {
-        Serial.println();
-        Serial.println("No response.");
-        //If you have no response, maybe need a greater value of waitingTime
-        break;
-      }
-    }
-    Serial.println();   
-    while (client.available()) {
-      Serial.print(char(client.read()));
-    }  
-  } else {         
-    Serial.println("Connected to " + String(myDomain) + " failed.");
-  }
-  client.stop();
+int base64_enc_len(int plainLen) {
+	int n = plainLen;
+	return (n + 2 - ((n + 2) % 3)) / 3 * 4;
 }
 
-//https://github.com/zenmanenergy/ESP8266-Arduino-Examples/
-String urlencode(String str)
-{
-    String encodedString="";
-    char c;
-    char code0;
-    char code1;
-    char code2;
-    for (int i =0; i < str.length(); i++){
-      c=str.charAt(i);
-      if (c == ' '){
-        encodedString+= '+';
-      } else if (isalnum(c)){
-        encodedString+=c;
-      } else{
-        code1=(c & 0xf)+'0';
-        if ((c & 0xf) >9){
-            code1=(c & 0xf) - 10 + 'A';
-        }
-        c=(c>>4)&0xf;
-        code0=c+'0';
-        if (c > 9){
-            code0=c - 10 + 'A';
-        }
-        code2='\0';
-        encodedString+='%';
-        encodedString+=code0;
-        encodedString+=code1;
-        //encodedString+=code2;
-      }
-      yield();
-    }
-    return encodedString;
+int base64_dec_len(char * input, int inputLen) {
+	int i = 0;
+	int numEq = 0;
+	for(i = inputLen - 1; input[i] == '='; i--) {
+		numEq++;
+	}
+
+	return ((6 * inputLen) / 8) - numEq;
+}
+
+inline void a3_to_a4(unsigned char * a4, unsigned char * a3) {
+	a4[0] = (a3[0] & 0xfc) >> 2;
+	a4[1] = ((a3[0] & 0x03) << 4) + ((a3[1] & 0xf0) >> 4);
+	a4[2] = ((a3[1] & 0x0f) << 2) + ((a3[2] & 0xc0) >> 6);
+	a4[3] = (a3[2] & 0x3f);
+}
+
+inline void a4_to_a3(unsigned char * a3, unsigned char * a4) {
+	a3[0] = (a4[0] << 2) + ((a4[1] & 0x30) >> 4);
+	a3[1] = ((a4[1] & 0xf) << 4) + ((a4[2] & 0x3c) >> 2);
+	a3[2] = ((a4[2] & 0x3) << 6) + a4[3];
+}
+
+inline unsigned char b64_lookup(char c) {
+	if(c >='A' && c <='Z') return c - 'A';
+	if(c >='a' && c <='z') return c - 71;
+	if(c >='0' && c <='9') return c + 4;
+	if(c == '+') return 62;
+	if(c == '/') return 63;
+	return -1;
 }
