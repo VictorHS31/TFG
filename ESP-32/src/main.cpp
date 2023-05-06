@@ -6,11 +6,11 @@
 
 #include "esp_camera.h"
 
-const char* ssid     = "MIWIFI_2G_hhGV";   //your network SSID
-const char* password = "XXXXXX";   //your network password
+const char* ssid     = "Vivi";   //your network SSID
+const char* password = "tfguc3m2023";   //your network password
 const char* myDomain = "script.google.com";
-// https://script.google.com/macros/s/AKfycbzl4qdbOAtaRXJipOlBZniQ299GMk6YE9i_1IqqpFFw2-SpkxPXeqMUVjomGbqpc6vT/exec
-String myScript = "/macros/s/AKfycbzl4qdbOAtaRXJipOlBZniQ299GMk6YE9i_1IqqpFFw2-SpkxPXeqMUVjomGbqpc6vT/exec";    //Replace with your own url
+// https://script.google.com/macros/s/AKfycbzoSBAgEfyecR5_avfdfR5oouw0xJbqnGEAclzrcr9qjKCUUe-Qs3jQMcXrEfWrj6DJXw/exec
+String myScript = "/macros/s/AKfycbzoSBAgEfyecR5_avfdfR5oouw0xJbqnGEAclzrcr9qjKCUUe-Qs3jQMcXrEfWrj6DJXw/exec";    //Replace with your own url
 String myFilename = "filename=ESP32-CAM.jpg";
 String mimeType = "&mimetype=image/jpeg";
 String myImage = "&data=";
@@ -73,6 +73,7 @@ String urlencode(String str)
 void saveCapturedImage() {
   Serial.println("Connect to " + String(myDomain));
   WiFiClientSecure client;
+  client.setInsecure();
   
   if (client.connect(myDomain, 443)) {
     Serial.println("Connection successful");
@@ -197,7 +198,7 @@ void loop() {
   //if(enviar) {
     saveCapturedImage();
     enviar = false;
-    delay(60000);
+    delay(10000);
   //}
 }
 
