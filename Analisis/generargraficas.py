@@ -10,7 +10,6 @@ def visualizacion(parametro):
     tamaños = []
     for poblacion in poblaciones:
         aux = df.query("{} == '{}'".format(parametro, poblacion))
-        aux = df.query("ValLoss < 2")
         tamaños.append(aux)
     valloss = []
     valacc = []
