@@ -156,9 +156,8 @@ void setup()
   Serial.println("");
   Serial.println("STAIP address: ");
   Serial.println(WiFi.localIP());
-    
   Serial.println("");
-
+  pinMode(4, OUTPUT);
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -196,7 +195,10 @@ boolean enviar = true;
 
 void loop() {
   //if(enviar) {
+    digitalWrite (4,HIGH);
     saveCapturedImage();
+    delay(100);
+    digitalWrite (4,LOW);
     enviar = false;
     delay(10000);
   //}
